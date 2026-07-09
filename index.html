@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VNPT - THEO DOI VAT TU ONLINE</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        @media (max-width: 767px) {
+            input, select, textarea { font-size: 16px !important; }
+        }
+        /* Hiệu ứng loading */
+        .loader {
+            border: 3px solid #f3f3f3; border-top: 3px solid #005baa;
+            border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+
+    <div id="login-container" class="fixed inset-0 bg-gray-100 flex items-center justify-center z-[9999] px-4">
+        <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md border border-gray-200 w-full max-w-md">
+            <div class="text-center mb-6">
+                <div class="font-bold text-3xl tracking-wider mb-2">
+                    <span class="text-[#005baa]">VN</span><span class="text-[#00a1e4]">PT</span>
+                </div>
+                <h2 class="text-base sm:text-lg font-semibold text-gray-700 uppercase tracking-wide">Đăng nhập Hệ thống</h2>
+            </div>
+            <form id="login-form" class="space-y-4">
+                <div class="space-y-1">
+                    <label class="block text-xs font-semibold text-gray-600">Tên đăng nhập</label>
+                    <input type="text" id="username" required class="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm bg-white">
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs font-semibold text-gray-600">Mật khẩu</label>
+                    <input type="password" id="password" required class="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm bg-white">
+                </div>
+                <div id="login-error" class="text-red-500 text-xs hidden font-medium">
+                    * Tên đăng nhập hoặc mật khẩu không chính xác!
+                </div>
+                <button type="submit" class="w-full bg-[#005baa] hover:bg-[#004b8c] text-white py-3 rounded-md font-medium text-sm transition shadow-sm cursor-pointer active:scale-[0.98]">
+                    Đăng Nhập
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="main-content" class="hidden">
+        <header class="bg-white shadow-sm border-b border-blue-100 sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-0">
+                <div class="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-start">
+                    <div class="flex items-center font-bold text-2xl tracking-wider">
+                        <span class="text-[#005baa]">VN</span><span class="text-[#00a1e4]">PT</span>
+                    </div>
+                    <div class="h-6 w-px bg-gray-300 mx-2 hidden sm:block"></div>
+                    <h1 class="text-base sm:text-xl font-semibold text-gray-700 text-center sm:text-left flex-1 sm:flex-initial truncate">HỆ THỐNG VẬT TƯ SỰ CỐ (ONLINE)</h1>
+                </div>
+                <div class="flex justify-between sm:justify-end items-center w-full sm:w-auto space-x-5 text-xs sm:text-sm text-gray-500 border-t border-gray-100 pt-2 sm:pt-0 sm:border-none">
+                    <div class="flex items-center gap-2">
+                        <span id="sync-status" class="text-green-600 font-medium"><i class="fa-solid fa-cloud-arrow-up"></i> Đã đồng bộ</span>
+                        <div id="sync-loader" class="loader hidden"></div>
+                    </div>
+                    <button id="btn-logout" class="text-red-600 hover:text-red-800 font-medium flex items-center gap-1 cursor-pointer transition py-1">
+                        <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+
+            <section class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                <div class="bg-white p-3 sm:p-4 rounded-xl shadow-xs border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider">Tổng phiếu</p>
+                        <h3 class="text-xl sm:text-2xl font-bold text-gray-800 mt-1" id="dash-total">0</h3>
+                    </div>
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center text-lg sm:text-xl">
+                        <i class="fa-solid fa-file-invoice"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-3 sm:p-4 rounded-xl shadow-xs border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider">Đã giao VTT</p>
+                        <h3 class="text-xl sm:text-2xl font-bold text-green-600 mt-1" id="dash-delivered">0</h3>
+                    </div>
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 bg-green-50 text-green-600 rounded-lg flex items-center justify-center text-lg sm:text-xl">
+                        <i class="fa-solid fa-truck-ramp-box"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-3 sm:p-4 rounded-xl shadow-xs border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider">Chưa bàn giao</p>
+                        <h3 class="text-xl sm:text-2xl font-bold text-amber-600 mt-1" id="dash-pending-recall">0</h3>
+                    </div>
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center text-lg sm:text-xl">
+                        <i class="fa-solid fa-boxes-packing"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-3 sm:p-4 rounded-xl shadow-xs border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider">Đã bàn giao</p>
+                        <h3 class="text-xl sm:text-2xl font-bold text-purple-600 mt-1" id="dash-done-recall">0</h3>
+                    </div>
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 bg-purple-50 text-purple-600 rounded-lg flex items-center justify-center text-lg sm:text-xl">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
+                <div class="bg-[#005baa] text-white px-4 sm:px-6 py-3 flex justify-between items-center">
+                    <h2 class="font-medium text-sm sm:text-lg flex items-center gap-2">
+                        <i class="fa-solid fa-pen-to-square"></i> <span id="form-title">Thêm Phiếu Theo Dõi Mới</span>
+                    </h2>
+                    <button type="button" id="btn-cancel-edit" class="hidden text-xs bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-md transition">
+                        Hủy cập nhật
+                    </button>
+                </div>
+                
+                <form id="job-form" class="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input type="hidden" id="edit-index" value="-1">
+
+                    <div class="space-y-1">
+                        <label class="block text-xs font-semibold text-gray-600">Tên Tỉnh <span class="text-red-500">*</span></label>
+                        <input type="text" id="province" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm bg-white">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs font-semibold text-gray-600">Tên Trạm <span class="text-red-500">*</span></label>
+                        <input type="text" id="station" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm bg-white">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs font-semibold text-gray-600">Mã Phiếu Sự Cố <span class="text-red-500">*</span></label>
+                        <input type="text" id="ticket-id" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm bg-white">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs font-semibold text-gray-600">Ngày Tháng Sự Cố</label>
+                        <input type="date" id="ticket-date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm bg-white">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs font-semibold text-gray-600">Theo Lệnh Ứng Cứu</label>
+                        <input type="text" id="emergency-order" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm bg-white" placeholder="Nhập số lệnh...">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs font-semibold text-gray-600">Số Phiếu Xuất Kho</label>
+                        <input type="text" id="export-ticket-id" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm bg-white">
+                    </div>
+
+                    <div class="md:col-span-3 bg-gray-50 p-3 rounded-lg border border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div class="md:col-span-3 text-xs font-bold text-blue-800 uppercase tracking-wider mb-[-5px]">
+                            Vật tư cần cấp xử lý
+                        </div>
+                        <div class="space-y-1">
+                            <label class="block text-xs text-gray-600">Tên vật tư</label>
+                            <input type="text" id="material-name" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="block text-xs text-gray-600">Serial</label>
+                            <input type="text" id="material-serial" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="block text-xs text-gray-600">Số lượng</label>
+                            <input type="number" id="material-qty" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm">
+                        </div>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="block text-xs font-semibold text-gray-600">Người Giao Vật Tư</label>
+                        <select id="sender-name" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm bg-white">
+                            <option value="">-- Chọn người giao --</option>
+                            <option value="Phạm Thị Tuyết Hồng">Phạm Thị Tuyết Hồng</option>
+                            <option value="Nguyễn Thị Ngân">Nguyễn Thị Ngân</option>
+                            <option value="Hoàng Thị Hiếu">Hoàng Thị Hiếu</option>
+                            <option value="Lê Thị Anh">Lê Thị Anh</option>
+                            <option value="Trần Thị Kim Oanh">Trần Thị Kim Oanh</option>
+                            <option value="Lưu Hồng Sơn">Lưu Hồng Sơn</option>
+                            <option value="Nghiêm Quang Dũng">Nghiêm Quang Dũng</option>
+                            <option value="Lương Văn Hiếu">Lương Văn Hiếu</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs font-semibold text-gray-600">Người Nhận Vật Tư</label>
+                        <input type="text" id="receiver-name" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm bg-white">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs font-semibold text-gray-600">Ngày Tháng Giao Vật Tư</label>
+                        <input type="date" id="delivery-date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm bg-white">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs font-semibold text-gray-600">Ngày Nhận Vật Tư Thu Hồi</label>
+                        <input type="date" id="recall-date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm bg-white">
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="block text-xs font-semibold text-gray-600">Tiến Độ Giao Vật Tư</label>
+                        <select id="delivery-status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm font-medium bg-white">
+                            <option value="Đang chờ chuyển vật tư từ kho về" class="text-orange-600">Đang chờ chuyển vật tư từ kho về</option>
+                            <option value="Đang chờ VTT nhận" class="text-blue-600">Đang chờ VTT nhận</option>
+                            <option value="Đã giao cho VTT" class="text-green-600">Đã giao cho VTT</option>
+                            <option value="Không có vật tư" class="text-red-600">Không có vật tư</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs font-semibold text-gray-600">Tiến Độ Thu Hồi Vật Tư</label>
+                        <select id="recall-status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500 text-sm font-medium bg-white">
+                            <option value="chưa bàn giao" class="text-red-600">chưa bàn giao</option>
+                            <option value="VTT đã bàn giao" class="text-green-600">VTT đã bàn giao</option>
+                        </select>
+                    </div>
+
+                    <div class="md:col-span-3 flex justify-end pt-2">
+                        <button type="submit" id="btn-submit" class="w-full sm:w-auto bg-[#005baa] hover:bg-[#004b8c] text-white px-6 py-3 rounded-md font-medium text-sm transition shadow-sm cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98]">
+                            <i class="fa-solid fa-floppy-disk"></i> Lưu Thông Tin
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
+                <div class="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-gray-50">
+                    <h2 class="font-semibold text-gray-700 text-sm sm:text-base flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-blue-600"></i> Danh Sách Theo Dõi Hệ Thống
+                    </h2>
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                        <button id="btn-refresh" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-rotate"></i> Tải lại dữ liệu
+                        </button>
+                        <button id="btn-export-excel" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-md text-xs font-medium transition shadow-sm cursor-pointer flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-file-excel"></i> Xuất File Excel
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto w-full -webkit-overflow-scrolling-touch">
+                    <table class="w-full text-left border-collapse min-w-[1000px] sm:min-w-[1200px]">
+                        <thead>
+                            <tr class="bg-gray-100/70 border-b border-gray-200 text-gray-600 text-xs uppercase font-bold">
+                                <th class="p-3 text-center w-12">STT</th>
+                                <th class="p-3">Thông Tin Chung</th>
+                                <th class="p-3">Sự Cố & Lệnh</th>
+                                <th class="p-3">Vật Tư Cấp Xử Lý</th>
+                                <th class="p-3">Giao Nhận Vật Tư</th>
+                                <th class="p-3">Tiến Độ Giao / Thu Hồi</th>
+                                <th class="p-3 text-center w-28">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-table-body" class="divide-y divide-gray-100 text-sm">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="empty-state" class="p-8 text-center text-gray-400 hidden">
+                    <i class="fa-regular fa-folder-open text-4xl mb-2 block"></i>
+                    Đang tải dữ liệu từ máy chủ hoặc chưa có dữ liệu...
+                </div>
+            </section>
+
+        </main>
+
+        <footer class="text-center py-6 text-xs text-gray-400 px-4">
+            &copy; 2026 VNPT - Hệ thống dữ liệu đám mây trực tuyến.
+        </footer>
+    </div>
+
+    <script>
+        // ================= CẤU HÌNH ĐƯỜNG LINK GOOGLE SHEETS =================
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzWft_NvnG1HBQ7soQDKaMVhV43570e_BX8Klz0hTQV1L2xM93085xHQ9gChuEdhKs2/exec";
+
+        // ================= ĐĂNG NHẬP =================
+        const loginContainer = document.getElementById('login-container');
+        const mainContent = document.getElementById('main-content');
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+        const btnLogout = document.getElementById('btn-logout');
+
+        if (sessionStorage.getItem('vnpt_authenticated') === 'true') {
+            loginContainer.classList.add('hidden');
+            mainContent.classList.remove('hidden');
+            loadDataFromCloud();
+        }
+
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (document.getElementById('username').value.trim() === 'tkt.nan' && document.getElementById('password').value === 'Tktnan@123') {
+                sessionStorage.setItem('vnpt_authenticated', 'true');
+                loginContainer.classList.add('hidden');
+                mainContent.classList.remove('hidden');
+                loadDataFromCloud();
+            } else {
+                loginError.classList.remove('hidden');
+            }
+        });
+
+        btnLogout.addEventListener('click', function() {
+            sessionStorage.removeItem('vnpt_authenticated');
+            loginContainer.classList.remove('hidden');
+            mainContent.classList.add('hidden');
+        });
+
+        // ================= QUẢN LÝ DỮ LIỆU ONLINE =================
+        let jobData = [];
+        const form = document.getElementById('job-form');
+        const tableBody = document.getElementById('data-table-body');
+        const emptyState = document.getElementById('empty-state');
+        const formTitle = document.getElementById('form-title');
+        const btnCancelEdit = document.getElementById('btn-cancel-edit');
+        const btnSubmit = document.getElementById('btn-submit');
+        const editIndexInput = document.getElementById('edit-index');
+        const syncStatus = document.getElementById('sync-status');
+        const syncLoader = document.getElementById('sync-loader');
+
+        function showLoading(isLoading) {
+            if(isLoading) {
+                syncStatus.innerHTML = "Đang đồng bộ...";
+                syncStatus.className = "text-amber-600 font-medium";
+                syncLoader.classList.remove('hidden');
+            } else {
+                syncStatus.innerHTML = "<i class='fa-solid fa-cloud-arrow-up'></i> Đã đồng bộ";
+                syncStatus.className = "text-green-600 font-medium";
+                syncLoader.classList.add('hidden');
+            }
+        }
+
+        // Tải dữ liệu từ Google Sheets về
+        function loadDataFromCloud() {
+            if(SCRIPT_URL.includes("THAY_URL")) return;
+            showLoading(true);
+            fetch(SCRIPT_URL)
+                .then(res => res.json())
+                .then(data => {
+                    jobData = data;
+                    renderTable();
+                    showLoading(false);
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Không thể tải dữ liệu trực tuyến. Kiểm tra lại cấu hình URL Apps Script!");
+                    showLoading(false);
+                });
+        }
+        document.getElementById('btn-refresh').addEventListener('click', loadDataFromCloud);
+
+        // Đẩy dữ liệu lên đám mây Google Sheets
+        function saveDataToCloud() {
+            if(SCRIPT_URL.includes("THAY_URL")) {
+                alert("Bạn chưa cấu hình URL Apps Script!");
+                return;
+            }
+            showLoading(true);
+            fetch(SCRIPT_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "update_all", data: jobData })
+            }).then(() => {
+                setTimeout(loadDataFromCloud, 1500); // Tải lại dữ liệu mới nhất sau khi lưu
+            }).catch(err => {
+                alert("Đồng bộ thất bại!");
+                showLoading(false);
+            });
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            if (dateStr.includes('/')) return dateStr; // Dữ liệu từ Sheet đã format sẵn
+            const [year, month, day] = dateStr.split('-');
+            return `${day}/${month}/${year}`;
+        }
+
+        function renderTable() {
+            tableBody.innerHTML = '';
+            if (jobData.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            jobData.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50/80 transition-colors";
+
+                let deliveryBadge = 'bg-gray-100 text-gray-700';
+                if(item.deliveryStatus === 'Đã giao cho VTT') deliveryBadge = 'bg-green-100 text-green-700';
+                else if(item.deliveryStatus === 'Đang chờ VTT nhận') deliveryBadge = 'bg-blue-100 text-blue-700';
+                else if(item.deliveryStatus === 'Đang chờ chuyển vật tư từ kho về') deliveryBadge = 'bg-orange-100 text-orange-700';
+                else if(item.deliveryStatus === 'Không có vật tư') deliveryBadge = 'bg-red-100 text-red-700';
+
+                let recallBadge = item.recallStatus === 'VTT đã bàn giao' ? 'bg-purple-100 text-purple-700' : 'bg-rose-100 text-rose-700';
+
+                tr.innerHTML = `
+                    <td class="p-3 text-center font-medium text-gray-400">${index + 1}</td>
+                    <td class="p-3">
+                        <div class="font-bold text-gray-900">${item.station}</div>
+                        <div class="text-xs text-gray-500">Tỉnh: ${item.province}</div>
+                    </td>
+                    <td class="p-3">
+                        <div class="text-xs"><span class="font-semibold text-gray-600">Mã:</span> <span class="font-mono text-blue-700">${item.ticketId}</span></div>
+                        <div class="text-xs text-gray-500">Ngày lỗi: ${formatDate(item.ticketDate)}</div>
+                        <div class="text-xs text-gray-500 mt-1"><span class="bg-gray-200 px-1.5 py-0.5 rounded text-[10px] font-medium text-gray-600">Lệnh: ${item.emergencyOrder || '-'}</span></div>
+                    </td>
+                    <td class="p-3">
+                        ${item.materialName ? `
+                            <div class="font-medium text-xs text-gray-800">${item.materialName}</div>
+                            <div class="text-[11px] text-gray-500 font-mono">S/N: ${item.materialSerial || '-'}</div>
+                            <div class="text-[11px] text-gray-600 font-semibold">SL: ${item.materialQty || '1'}</div>
+                        ` : '<span class="text-gray-400 text-xs italic">Không có thông tin</span>'}
+                    </td>
+                    <td class="p-3 text-xs space-y-1">
+                        <div><span class="text-gray-400">PXK:</span> <span class="font-medium">${item.exportTicketId || '-'}</span></div>
+                        <div><span class="text-gray-400">Giao:</span> <span class="font-medium">${item.senderName || '-'}</span> (${formatDate(item.deliveryDate)})</div>
+                        <div><span class="text-gray-400">Nhận:</span> <span class="font-medium">${item.receiverName || '-'}</span></div>
+                    </td>
+                    <td class="p-3 space-y-2">
+                        <div><span class="px-2 py-0.5 inline-block text-[11px] font-semibold rounded-full ${deliveryBadge}">${item.deliveryStatus}</span></div>
+                        <div><span class="px-2 py-0.5 inline-block text-[11px] font-semibold rounded-full ${recallBadge}">Thu hồi: ${item.recallStatus}</span></div>
+                        ${item.recallDate ? `<div class="text-[10px] text-gray-400">Ngày nhận TH: ${formatDate(item.recallDate)}</div>` : ''}
+                    </td>
+                    <td class="p-3 text-center">
+                        <div class="inline-flex rounded-md shadow-xs">
+                            <button onclick="editJob(${index})" class="px-3 py-2 text-xs font-medium text-blue-600 bg-white border border-gray-200 rounded-s-lg hover:bg-gray-100 cursor-pointer"><i class="fa-solid fa-pen"></i> Sửa</button>
+                            <button onclick="deleteJob(${index})" class="px-3 py-2 text-xs font-medium text-red-600 bg-white border-t border-b border-r border-gray-200 rounded-e-lg hover:bg-red-50 cursor-pointer"><i class="fa-solid fa-trash"></i> Xóa</button>
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            // Cập nhật Dashboard thống kê nhanh
+            document.getElementById('dash-total').innerText = jobData.length;
+            document.getElementById('dash-delivered').innerText = jobData.filter(i => i.deliveryStatus === "Đã giao cho VTT").length;
+            document.getElementById('dash-pending-recall').innerText = jobData.filter(i => i.recallStatus === "chưa bàn giao").length;
+            document.getElementById('dash-done-recall').innerText = jobData.filter(i => i.recallStatus === "VTT đã bàn giao").length;
+        }
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const index = parseInt(editIndexInput.value);
+            
+            const formData = {
+                province: document.getElementById('province').value.trim(),
+                station: document.getElementById('station').value.trim(),
+                ticketId: document.getElementById('ticket-id').value.trim(),
+                ticketDate: document.getElementById('ticket-date').value,
+                emergencyOrder: document.getElementById('emergency-order').value.trim(),
+                exportTicketId: document.getElementById('export-ticket-id').value.trim(),
+                materialName: document.getElementById('material-name').value.trim(),
+                materialSerial: document.getElementById('material-serial').value.trim(),
+                materialQty: document.getElementById('material-qty').value,
+                senderName: document.getElementById('sender-name').value,
+                receiverName: document.getElementById('receiver-name').value.trim(),
+                deliveryDate: document.getElementById('delivery-date').value,
+                recallDate: document.getElementById('recall-date').value,
+                deliveryStatus: document.getElementById('delivery-status').value,
+                recallStatus: document.getElementById('recall-status').value
+            };
+
+            if (index === -1) {
+                jobData.push(formData);
+            } else {
+                jobData[index] = formData;
+                resetFormState();
+            }
+
+            renderTable();
+            form.reset();
+            saveDataToCloud(); // Đồng bộ ngay lên đám mây toàn hệ thống
+        });
+
+        window.editJob = function(index) {
+            const data = jobData[index];
+            editIndexInput.value = index;
+            formTitle.innerText = "Cập Nhật Phiếu: " + data.ticketId;
+            btnCancelEdit.classList.remove('hidden');
+            btnSubmit.innerHTML = `<i class="fa-solid fa-check"></i> Cập Nhật`;
+            btnSubmit.className = "w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-md font-medium text-sm transition flex items-center justify-center gap-2";
+
+            document.getElementById('province').value = data.province;
+            document.getElementById('station').value = data.station;
+            document.getElementById('ticket-id').value = data.ticketId;
+            // Xử lý chuỗi ngày nếu có định dạng dd/mm/yyyy từ Sheet chuyển ngược sang yyyy-mm-dd của input
+            if(data.ticketDate && data.ticketDate.includes('/')) {
+                const parts = data.ticketDate.split('/');
+                document.getElementById('ticket-date').value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            } else { document.getElementById('ticket-date').value = data.ticketDate; }
+            
+            document.getElementById('emergency-order').value = data.emergencyOrder;
+            document.getElementById('export-ticket-id').value = data.exportTicketId;
+            document.getElementById('material-name').value = data.materialName;
+            document.getElementById('material-serial').value = data.materialSerial;
+            document.getElementById('material-qty').value = data.materialQty;
+            document.getElementById('sender-name').value = data.senderName;
+            document.getElementById('receiver-name').value = data.receiverName;
+            
+            if(data.deliveryDate && data.deliveryDate.includes('/')) {
+                const parts = data.deliveryDate.split('/');
+                document.getElementById('delivery-date').value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            } else { document.getElementById('delivery-date').value = data.deliveryDate; }
+
+            if(data.recallDate && data.recallDate.includes('/')) {
+                const parts = data.recallDate.split('/');
+                document.getElementById('recall-date').value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            } else { document.getElementById('recall-date').value = data.recallDate; }
+
+            document.getElementById('delivery-status').value = data.deliveryStatus;
+            document.getElementById('recall-status').value = data.recallStatus;
+
+            form.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function resetFormState() {
+            editIndexInput.value = "-1";
+            formTitle.innerText = "Thêm Phiếu Theo Dõi Mới";
+            btnCancelEdit.classList.add('hidden');
+            btnSubmit.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> Lưu Thông Tin`;
+            btnSubmit.className = "w-full sm:w-auto bg-[#005baa] hover:bg-[#004b8c] text-white px-6 py-3 rounded-md font-medium text-sm transition flex items-center justify-center gap-2";
+            form.reset();
+        }
+        btnCancelEdit.addEventListener('click', resetFormState);
+
+        window.deleteJob = function(index) {
+            if(confirm("Bạn có chắc chắn muốn xóa thông tin phiếu sự cố này trực tuyến?")) {
+                jobData.splice(index, 1);
+                renderTable();
+                if (editIndexInput.value == index) resetFormState();
+                saveDataToCloud(); // Đồng bộ lệnh xóa lên đám mây
+            }
+        }
+
+        // ================= XUẤT FILE EXCEL BÁO CÁO =================
+        document.getElementById('btn-export-excel').addEventListener('click', function() {
+            if (jobData.length === 0) { alert("Không có số liệu để thực hiện xuất file Excel!"); return; }
+            const dataToExport = jobData.map((item, idx) => ({
+                "STT": idx + 1, "Tỉnh/Thành": item.province, "Tên Trạm": item.station, "Mã Phiếu Sự Cố": item.ticketId,
+                "Ngày Sự Cố": formatDate(item.ticketDate), "Theo Lệnh Ứng Cứu": item.emergencyOrder || '-', "Số Phiếu Xuất Kho": item.exportTicketId || '-',
+                "Tên Vật Tư Cấp": item.materialName || '-', "Mã Serial (S/N)": item.materialSerial || '-', "Số Lượng": item.materialQty || '1',
+                "Họ Tên Người Giao": item.senderName || '-', "Ngày Giao VT": formatDate(item.deliveryDate), "Họ Tên Người Nhận": item.receiverName || '-',
+                "Tiến Độ Giao Vật Tư": item.deliveryStatus, "Trạng Thái Thu Hồi": item.recallStatus, "Ngày Nhận Thu Hồi": formatDate(item.recallDate)
+            }));
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Báo cáo vật tư");
+            worksheet['!cols'] = [{wch: 6}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 18}, {wch: 22}, {wch: 25}, {wch: 18}, {wch: 12}, {wch: 20}, {wch: 15}, {wch: 20}, {wch: 28}, {wch: 20}, {wch: 18}];
+            XLSX.writeFile(workbook, `VNPT_Vat_Tu_Online_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`);
+        });
+    </script>
+</body>
+</html>
