@@ -17,6 +17,13 @@
             border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* CSS phục vụ riêng cho việc In Biên Bản */
+        @media print {
+            body * { visibility: hidden; }
+            #print-section, #print-section * { visibility: visible; }
+            #print-section { position: absolute; left: 0; top: 0; width: 100%; font-family: "Times New Roman", Times, serif; color: #000; }
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans antialiased">
@@ -252,7 +259,7 @@
                                 <th class="p-3">Vật Tư Cấp Xử Lý</th>
                                 <th class="p-3">Giao Nhận Vật Tư</th>
                                 <th class="p-3">Tiến Độ Giao / Thu Hồi</th>
-                                <th class="p-3 text-center w-28">Thao Tác</th>
+                                <th class="p-3 text-center w-36">Thao Tác</th>
                             </tr>
                         </thead>
                         <tbody id="data-table-body" class="divide-y divide-gray-100 text-sm">
@@ -271,6 +278,9 @@
             &copy; 2026 VNPT - Hệ thống dữ liệu đám mây trực tuyến.
         </footer>
     </div>
+
+    <!-- Khung chứa nội dung biên bản phục vụ cho việc in ấn ẩn trên giao diện chính -->
+    <div id="print-section" class="hidden"></div>
 
     <script>
         // ================= CẤU HÌNH ĐƯỜNG LINK GOOGLE SHEETS =================
@@ -426,9 +436,10 @@
                         ${item.recallDate ? `<div class="text-[10px] text-gray-400">Ngày nhận TH: ${formatDate(item.recallDate)}</div>` : ''}
                     </td>
                     <td class="p-3 text-center">
-                        <div class="inline-flex rounded-md shadow-xs">
-                            <button onclick="editJob(${index})" class="px-3 py-2 text-xs font-medium text-blue-600 bg-white border border-gray-200 rounded-s-lg hover:bg-gray-100 cursor-pointer"><i class="fa-solid fa-pen"></i> Sửa</button>
-                            <button onclick="deleteJob(${index})" class="px-3 py-2 text-xs font-medium text-red-600 bg-white border-t border-b border-r border-gray-200 rounded-e-lg hover:bg-red-50 cursor-pointer"><i class="fa-solid fa-trash"></i> Xóa</button>
+                        <div class="inline-flex rounded-md shadow-xs flex-col space-y-1 sm:flex-row sm:space-y-0">
+                            <button onclick="printReceipt(${index})" class="px-2.5 py-1.5 text-xs font-medium text-green-600 bg-white border border-gray-200 rounded-md sm:rounded-none sm:rounded-s-lg hover:bg-gray-100 cursor-pointer"><i class="fa-solid fa-print"></i> In BB</button>
+                            <button onclick="editJob(${index})" class="px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-white border-t border-b border-l border-r sm:border-l-0 border-gray-200 hover:bg-gray-100 cursor-pointer"><i class="fa-solid fa-pen"></i> Sửa</button>
+                            <button onclick="deleteJob(${index})" class="px-2.5 py-1.5 text-xs font-medium text-red-600 bg-white border border-gray-200 rounded-md sm:rounded-none sm:rounded-e-lg hover:bg-red-50 cursor-pointer"><i class="fa-solid fa-trash"></i> Xóa</button>
                         </div>
                     </td>
                 `;
@@ -440,6 +451,141 @@
             document.getElementById('dash-delivered').innerText = jobData.filter(i => i.deliveryStatus === "Đã giao cho VTT").length;
             document.getElementById('dash-pending-recall').innerText = jobData.filter(i => i.recallStatus === "chưa bàn giao").length;
             document.getElementById('dash-done-recall').innerText = jobData.filter(i => i.recallStatus === "VTT đã bàn giao").length;
+        }
+
+        // ================= HÀM XUẤT VÀ IN BIÊN BẢN BÀN GIAO =================
+        window.printReceipt = function(index) {
+            const data = jobData[index];
+            const printSection = document.getElementById('print-section');
+            
+            // Xử lý thông tin ngày tháng để điền vào tiêu đề biên bản
+            let printDay = "……", printMonth = "……", printYear = "2026";
+            if (data.deliveryDate) {
+                const dateParts = data.deliveryDate.includes('-') ? data.deliveryDate.split('-') : data.deliveryDate.split('/');
+                if (data.deliveryDate.includes('-')) { // yyyy-mm-dd
+                    printYear = dateParts[0]; printMonth = dateParts[1]; printDay = dateParts[2];
+                } else { // dd/mm/yyyy
+                    printDay = dateParts[0]; printMonth = dateParts[1]; printYear = dateParts[2];
+                }
+            }
+
+            // Xử lý thông tin ngày tháng sự cố
+            let faultDay = "……", faultMonth = "……";
+            if (data.ticketDate) {
+                const dateParts = data.ticketDate.includes('-') ? data.ticketDate.split('-') : data.ticketDate.split('/');
+                if (data.ticketDate.includes('-')) {
+                    faultMonth = dateParts[1]; faultDay = dateParts[2];
+                } else {
+                    faultDay = dateParts[0]; faultMonth = dateParts[1];
+                }
+            }
+
+            // Tạo mã HTML động theo cấu trúc mẫu biểu văn bản hành chính
+            printSection.innerHTML = `
+                <div style="padding: 20px; font-size: 14px; line-height: 1.5; color: #000;">
+                    <!-- Phần đầu: Tên đơn vị & Quốc hiệu -->
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="width: 45%; text-align: center; vertical-align: top;">
+                                <div style="font-size: 12px; font-weight: bold; uppercase">TRUNG TÂM HẠ TẦNG MẠNG MIỀN BẮC</div>
+                                <div style="font-size: 13px; font-weight: bold; text-decoration: underline; uppercase">ĐÀI VIỄN THÔNG NGHỆ AN</div>
+                            </td>
+                            <td style="width: 55%; text-align: center; vertical-align: top;">
+                                <div style="font-size: 13px; font-weight: bold;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                                <div style="font-size: 14px; font-weight: bold; text-decoration: underline;">Độc lập - Tự do - Hạnh phúc</div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td style="text-align: right; font-style: italic; font-size: 13px; padding-top: 10px; padding-right: 20px;">
+                                Vinh, ngày ${printDay} tháng ${printMonth} năm ${printYear}
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Tiêu đề biên bản -->
+                    <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 20px; margin-bottom: 5px;">BIÊN BẢN NGHIỆM THU BÀN GIAO</div>
+                    <div style="text-align: center; font-style: italic; font-size: 14px; margin-bottom: 25px;">Vật tư, thiết bị lắp đặt hoàn thành</div>
+
+                    <!-- Nội dung căn cứ và thành phần tham gia -->
+                    <div style="margin-bottom: 12px; text-align: justify;">
+                        &nbsp;&nbsp;&nbsp;&nbsp;Căn cứ mã sự cố: <span style="font-weight: bold; font-family: monospace;">${data.ticketId || '……'}</span> ngày ${faultDay} tháng ${faultMonth} năm 2026 về việc “cấp vật tư xử lý sự cố trạm ${data.station || '…………' }”;
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        Tại: trạm <span style="font-weight: bold;">${data.station || '…………'}</span>, chúng tôi gồm:
+                    </div>
+
+                    <div style="margin-bottom: 8px; font-weight: bold;">ĐẠI DIỆN BÊN GIAO:</div>
+                    <table style="width: 100%; margin-bottom: 12px; margin-left: 15px;">
+                        <tr>
+                            <td style="width: 50%;">Ông (Bà): <span style="font-weight: bold;">${data.senderName || 'Hoàng Thị Ngọc'}</span></td>
+                            <td>Đơn vị: Tổ kỹ thuật</td>
+                        </tr>
+                    </table>
+
+                    <div style="margin-bottom: 8px; font-weight: bold;">ĐẠI DIỆN BÊN NHẬN:</div>
+                    <table style="width: 100%; margin-bottom: 12px; margin-left: 15px;">
+                        <tr>
+                            <td style="width: 50%;">Ông (Bà): <span style="font-weight: bold;">${data.receiverName || '…………………………'}</span></td>
+                            <td>Đơn vị: Tổ kỹ thuật</td>
+                        </tr>
+                    </table>
+
+                    <div style="margin-bottom: 20px;">
+                        <span style="font-weight: bold;">ĐỊA ĐIỂM:</span> Trạm ${data.station || '……………………………….'}
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        Tiến hành nghiệm thu bàn giao, nội dung cụ thể như sau:
+                    </div>
+
+                    <!-- Bảng thông số vật tư cấp phát -->
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;" border="1">
+                        <thead>
+                            <tr style="background-color: #f2f2f2; font-weight: bold; text-align: center; font-size: 13px;">
+                                <th style="padding: 8px; width: 8%;">STT</th>
+                                <th style="padding: 8px; width: 40%;">TÊN VẬT TƯ / THIẾT BỊ</th>
+                                <th style="padding: 8px; width: 25%;">MÃ, SERIAL</th>
+                                <th style="padding: 8px; width: 12%;">Đơn vị Tính</th>
+                                <th style="padding: 8px; width: 15%;">Số Lượng</th>
+                                <th style="padding: 8px; width: 15%;">Ghi Chú</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="text-align: center;">
+                                <td style="padding: 8px;">1</td>
+                                <td style="padding: 8px; text-align: left; font-weight: bold;">${data.materialName || '-'}</td>
+                                <td style="padding: 8px; font-family: monospace;">${data.materialSerial || '-'}</td>
+                                <td style="padding: 8px;">Cái/Bộ</td>
+                                <td style="padding: 8px; font-weight: bold;">${data.materialQty || '1'}</td>
+                                <td style="padding: 8px; font-size: 12px;">${data.exportTicketId ? 'PXK: ' + data.exportTicketId : '-'}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div style="margin-bottom: 35px; text-align: justify;">
+                        Toàn bộ vật tư, thiết bị trên đã được lắp đặt hoàn thành và bàn giao đưa vào sử dụng. Biên bản được lập thành 02 bản có giá trị như nhau. Mỗi bên giữ 01 bản.
+                    </div>
+
+                    <!-- Phần ký tên của các bên liên quan -->
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 20px; text-align: center;">
+                        <tr style="font-weight: bold;">
+                            <td style="width: 25%; padding-bottom: 80px;">NGƯỜI GIAO</td>
+                            <td style="width: 25%; padding-bottom: 80px;">NGƯỜI NHẬN</td>
+                            <td style="width: 25%; padding-bottom: 80px;">TỔ/ TRẠM TRƯỞNG</td>
+                            <td style="width: 25%; padding-bottom: 80px;">TRƯỞNG ĐÀI</td>
+                        </tr>
+                        <tr style="font-weight: bold;">
+                            <td>${data.senderName || 'Hoàng Thị Ngọc'}</td>
+                            <td>${data.receiverName || ''}</td>
+                            <td>Bùi Thanh Đạt</td>
+                            <td>Trần Văn Khoa</td>
+                        </tr>
+                    </table>
+                </div>
+            `;
+            
+            // Kích hoạt lệnh in hệ thống
+            window.print();
         }
 
         form.addEventListener('submit', function(e) {
