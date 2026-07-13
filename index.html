@@ -7,6 +7,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- THƯ VIỆN ĐỂ XUẤT FILE WORD (.DOCX) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.js"></script>
     <style>
         @media (max-width: 767px) {
             input, select, textarea { font-size: 16px !important; }
@@ -17,13 +19,6 @@
             border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* CSS phục vụ riêng cho việc In Biên Bản */
-        @media print {
-            body * { visibility: hidden; }
-            #print-section, #print-section * { visibility: visible; }
-            #print-section { position: absolute; left: 0; top: 0; width: 100%; font-family: "Times New Roman", Times, serif; color: #000; }
-        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans antialiased">
@@ -279,9 +274,6 @@
         </footer>
     </div>
 
-    <!-- Khung chứa nội dung biên bản phục vụ cho việc in ấn ẩn trên giao diện chính -->
-    <div id="print-section" class="hidden"></div>
-
     <script>
         // ================= CẤU HÌNH ĐƯỜNG LINK GOOGLE SHEETS =================
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwBF8lwNMNb1Eu4oiYfEDQB6hBhpA5dXjeDXM1bMdDkrVv2amQRAk6goKV48yDCEQLE/exec";
@@ -436,10 +428,10 @@
                         ${item.recallDate ? `<div class="text-[10px] text-gray-400">Ngày nhận TH: ${formatDate(item.recallDate)}</div>` : ''}
                     </td>
                     <td class="p-3 text-center">
-                        <div class="inline-flex rounded-md shadow-xs flex-col space-y-1 sm:flex-row sm:space-y-0">
-                            <button onclick="printReceipt(${index})" class="px-2.5 py-1.5 text-xs font-medium text-green-600 bg-white border border-gray-200 rounded-md sm:rounded-none sm:rounded-s-lg hover:bg-gray-100 cursor-pointer"><i class="fa-solid fa-print"></i> In BB</button>
-                            <button onclick="editJob(${index})" class="px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-white border-t border-b border-l border-r sm:border-l-0 border-gray-200 hover:bg-gray-100 cursor-pointer"><i class="fa-solid fa-pen"></i> Sửa</button>
-                            <button onclick="deleteJob(${index})" class="px-2.5 py-1.5 text-xs font-medium text-red-600 bg-white border border-gray-200 rounded-md sm:rounded-none sm:rounded-e-lg hover:bg-red-50 cursor-pointer"><i class="fa-solid fa-trash"></i> Xóa</button>
+                        <div class="inline-flex rounded-md shadow-xs flex-col gap-1 sm:flex-row">
+                            <button onclick="exportWordJob(${index})" class="px-2 py-1.5 text-xs font-medium text-purple-600 bg-white border border-gray-200 rounded-s-lg hover:bg-purple-50 cursor-pointer flex items-center gap-1 justify-center" title="Xuất biên bản Word"><i class="fa-solid fa-file-word"></i> Xuất BB</button>
+                            <button onclick="editJob(${index})" class="px-2 py-1.5 text-xs font-medium text-blue-600 bg-white border-t border-b border-gray-200 hover:bg-gray-100 cursor-pointer flex items-center gap-1 justify-center"><i class="fa-solid fa-pen"></i> Sửa</button>
+                            <button onclick="deleteJob(${index})" class="px-2 py-1.5 text-xs font-medium text-red-600 bg-white border border-gray-200 rounded-e-lg hover:bg-red-50 cursor-pointer flex items-center gap-1 justify-center"><i class="fa-solid fa-trash"></i> Xóa</button>
                         </div>
                     </td>
                 `;
@@ -451,133 +443,6 @@
             document.getElementById('dash-delivered').innerText = jobData.filter(i => i.deliveryStatus === "Đã giao cho VTT").length;
             document.getElementById('dash-pending-recall').innerText = jobData.filter(i => i.recallStatus === "chưa bàn giao").length;
             document.getElementById('dash-done-recall').innerText = jobData.filter(i => i.recallStatus === "VTT đã bàn giao").length;
-        }
-
-        // ================= HÀM XUẤT VÀ IN BIÊN BẢN BÀN GIAO =================
-        window.printReceipt = function(index) {
-            const data = jobData[index];
-            const printSection = document.getElementById('print-section');
-            
-            // Xử lý thông tin ngày tháng để điền vào tiêu đề biên bản
-            let printDay = "……", printMonth = "……", printYear = "2026";
-            if (data.deliveryDate) {
-                const dateParts = data.deliveryDate.includes('-') ? data.deliveryDate.split('-') : data.deliveryDate.split('/');
-                if (data.deliveryDate.includes('-')) { // yyyy-mm-dd
-                    printYear = dateParts[0]; printMonth = dateParts[1]; printDay = dateParts[2];
-                } else { // dd/mm/yyyy
-                    printDay = dateParts[0]; printMonth = dateParts[1]; printYear = dateParts[2];
-                }
-            }
-
-            // Xử lý thông tin ngày tháng sự cố
-            let faultDay = "……", faultMonth = "……";
-            if (data.ticketDate) {
-                const dateParts = data.ticketDate.includes('-') ? data.ticketDate.split('-') : data.ticketDate.split('/');
-                if (data.ticketDate.includes('-')) {
-                    faultMonth = dateParts[1]; faultDay = dateParts[2];
-                } else {
-                    faultDay = dateParts[0]; faultMonth = dateParts[1];
-                }
-            }
-
-            // Tạo mã HTML động theo cấu trúc mẫu biểu văn bản hành chính
-            printSection.innerHTML = `
-                <div style="padding: 20px; font-size: 14px; line-height: 1.5; color: #000;">
-                    <!-- Phần đầu: Tên đơn vị & Quốc hiệu -->
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                        <tr>
-                            <td style="width: 45%; text-align: center; vertical-align: top;">
-                                <div style="font-size: 12px; font-weight: bold; uppercase">TRUNG TÂM HẠ TẦNG MẠNG MIỀN BẮC</div>
-                                <div style="font-size: 13px; font-weight: bold; text-decoration: underline; uppercase">ĐÀI VIỄN THÔNG NGHỆ AN</div>
-                            </td>
-                            <td style="width: 55%; text-align: center; vertical-align: top;">
-                                <div style="font-size: 13px; font-weight: bold;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-                                <div style="font-size: 14px; font-weight: bold; text-decoration: underline;">Độc lập - Tự do - Hạnh phúc</div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td></td>
-                            <td style="text-align: right; font-style: italic; font-size: 13px; padding-top: 10px; padding-right: 20px;">
-                                Vinh, ngày ${printDay} tháng ${printMonth} năm ${printYear}
-                            </td>
-                        </tr>
-                    </table>
-                    <!-- Tiêu đề biên bản -->
-                    <div style="text-align: center; font-weight: bold; font-size: 16px; margin-top: 20px; margin-bottom: 5px;">BIÊN BẢN NGHIỆM THU BÀN GIAO</div>
-                    <div style="text-align: center; font-style: italic; font-size: 14px; margin-bottom: 25px;">Vật tư, thiết bị lắp đặt hoàn thành</div>
-                    <!-- Nội dung căn cứ và thành phần tham gia -->
-                    <div style="margin-bottom: 12px; text-align: justify;">
-                        &nbsp;&nbsp;&nbsp;&nbsp;Căn cứ mã sự cố: <span style="font-weight: bold; font-family: monospace;">${data.ticketId || '……'}</span> ngày ${faultDay} tháng ${faultMonth} năm 2026 về việc “cấp vật tư xử lý sự cố trạm ${data.station || '…………' }”;
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        Tại: trạm <span style="font-weight: bold;">${data.station || '…………'}</span>, chúng tôi gồm:
-                    </div>
-                    <div style="margin-bottom: 8px; font-weight: bold;">ĐẠI DIỆN BÊN GIAO:</div>
-                    <table style="width: 100%; margin-bottom: 12px; margin-left: 15px;">
-                        <tr>
-                            <td style="width: 50%;">Ông (Bà): <span style="font-weight: bold;">${data.senderName || 'Hoàng Thị Ngọc'}</span></td>
-                            <td>Đơn vị: Tổ kỹ thuật</td>
-                        </tr>
-                    </table>
-                    <div style="margin-bottom: 8px; font-weight: bold;">ĐẠI DIỆN BÊN NHẬN:</div>
-                    <table style="width: 100%; margin-bottom: 12px; margin-left: 15px;">
-                        <tr>
-                            <td style="width: 50%;">Ông (Bà): <span style="font-weight: bold;">${data.receiverName || '…………………………'}</span></td>
-                            <td>Đơn vị: Tổ kỹ thuật</td>
-                        </tr>
-                    </table>
-                    <div style="margin-bottom: 20px;">
-                        <span style="font-weight: bold;">ĐỊA ĐIỂM:</span> Trạm ${data.station || '……………………………….'}
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        Tiến hành nghiệm thu bàn giao, nội dung cụ thể như sau:
-                    </div>
-                    <!-- Bảng thông số vật tư cấp phát -->
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;" border="1">
-                        <thead>
-                            <tr style="background-color: #f2f2f2; font-weight: bold; text-align: center; font-size: 13px;">
-                                <th style="padding: 8px; width: 8%;">STT</th>
-                                <th style="padding: 8px; width: 40%;">TÊN VẬT TƯ / THIẾT BỊ</th>
-                                <th style="padding: 8px; width: 25%;">MÃ, SERIAL</th>
-                                <th style="padding: 8px; width: 12%;">Đơn vị Tính</th>
-                                <th style="padding: 8px; width: 15%;">Số Lượng</th>
-                                <th style="padding: 8px; width: 15%;">Ghi Chú</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr style="text-align: center;">
-                                <td style="padding: 8px;">1</td>
-                                <td style="padding: 8px; text-align: left; font-weight: bold;">${data.materialName || '-'}</td>
-                                <td style="padding: 8px; font-family: monospace;">${data.materialSerial || '-'}</td>
-                                <td style="padding: 8px;">Cái/Bộ</td>
-                                <td style="padding: 8px; font-weight: bold;">${data.materialQty || '1'}</td>
-                                <td style="padding: 8px; font-size: 12px;">${data.exportTicketId ? 'PXK: ' + data.exportTicketId : '-'}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div style="margin-bottom: 35px; text-align: justify;">
-                        Toàn bộ vật tư, thiết bị trên đã được lắp đặt hoàn thành và bàn giao đưa vào sử dụng. Biên bản được lập thành 02 bản có giá trị như nhau. Mỗi bên giữ 01 bản.
-                    </div>
-                    <!-- Phần ký tên của các bên liên quan -->
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 20px; text-align: center;">
-                        <tr style="font-weight: bold;">
-                            <td style="width: 25%; padding-bottom: 80px;">NGƯỜI GIAO</td>
-                            <td style="width: 25%; padding-bottom: 80px;">NGƯỜI NHẬN</td>
-                            <td style="width: 25%; padding-bottom: 80px;">TỔ/ TRẠM TRƯỞNG</td>
-                            <td style="width: 25%; padding-bottom: 80px;">TRƯỞNG ĐÀI</td>
-                        </tr>
-                        <tr style="font-weight: bold;">
-                            <td>${data.senderName || 'Hoàng Thị Ngọc'}</td>
-                            <td>${data.receiverName || ''}</td>
-                            <td>Bùi Thanh Đạt</td>
-                            <td>Trần Văn Khoa</td>
-                        </tr>
-                    </table>
-                </div>
-            `;
-            
-            // Kích hoạt lệnh in hệ thống
-            window.print();
         }
 
         form.addEventListener('submit', function(e) {
@@ -690,6 +555,230 @@
             worksheet['!cols'] = [{wch: 6}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 18}, {wch: 22}, {wch: 25}, {wch: 18}, {wch: 12}, {wch: 20}, {wch: 15}, {wch: 20}, {wch: 28}, {wch: 20}, {wch: 18}];
             XLSX.writeFile(workbook, `VNPT_Vat_Tu_Online_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.xlsx`);
         });
+
+        // ================= XUẤT BIÊN BẢN BÀN GIAO FILE WORD (.DOCX) =================
+        window.exportWordJob = function(index) {
+            const item = jobData[index];
+            if (!item) { alert("Không tìm thấy dữ liệu phiếu!"); return; }
+
+            // Lấy ngày tháng năm hiện tại cho biên bản
+            const now = new Date();
+            const currentDay = String(now.getDate()).padStart(2, '0');
+            const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+            const currentYear = now.getFullYear();
+
+            // Phân tách ngày lỗi
+            let errorDay = "……", errorMonth = "…..", errorYear = "2026";
+            if (item.ticketDate) {
+                const parts = item.ticketDate.includes('/') ? item.ticketDate.split('/') : item.ticketDate.split('-');
+                if(parts.length === 3) {
+                    if(item.ticketDate.includes('/')) {
+                        errorDay = parts[0]; errorMonth = parts[1]; errorYear = parts[2];
+                    } else {
+                        errorDay = parts[2]; errorMonth = parts[1]; errorYear = parts[0];
+                    }
+                }
+            }
+
+            const { Document, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, HeadingLevel } = docx;
+
+            // Định nghĩa style chữ mặc định
+            const fontName = "Times New Roman";
+            
+            // Tạo văn bản mới
+            const doc = new Document({
+                sections: [{
+                    properties: {},
+                    children: [
+                        // --- TIÊU NGỮ & CƠ QUAN (Bảng 2 cột ẩn viền) ---
+                        new Table({
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            borders: docx.Borders.NONE,
+                            rows: [
+                                new TableRow({
+                                    children: [
+                                        new TableCell({
+                                            width: { size: 45, type: WidthType.PERCENTAGE },
+                                            children: [
+                                                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "TRUNG TÂM HẠ TẦNG MẠNG MIỀN BẮC", font: fontName, size: 20 })] }),
+                                                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "ĐÀI VIỄN THÔNG NGHỆ AN", font: fontName, bold: true, size: 20 })] }),
+                                            ]
+                                        }),
+                                        new TableCell({
+                                            width: { size: 55, type: WidthType.PERCENTAGE },
+                                            children: [
+                                                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", font: fontName, bold: true, size: 20 })] }),
+                                                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Độc lập - Tự do - Hạnh phúc", font: fontName, bold: true, size: 22 })] }),
+                                                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `-----------------------`, font: fontName, size: 18 })] }),
+                                                new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `Vinh, ngày ${currentDay} tháng ${currentMonth} năm ${currentYear}`, font: fontName, italic: true, size: 22 })] }),
+                                            ]
+                                        })
+                                    ]
+                                })
+                            ]
+                        }),
+
+                        new Paragraph({ text: "", spacing: { after: 300 } }),
+
+                        // --- TIÊU ĐỀ BIÊN BẢN ---
+                        new Paragraph({
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 120 },
+                            children: [new TextRun({ text: "BIÊN BẢN NGHIỆM THU BÀN GIAO", font: fontName, bold: true, size: 28 })]
+                        }),
+                        new Paragraph({
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 300 },
+                            children: [new TextRun({ text: "Vật tư, thiết bị lắp đặt hoàn thành", font: fontName, bold: true, size: 24 })]
+                        }),
+
+                        // --- NỘI DUNG CĂN CỨ VÀ THÔNG TIN CHUNG ---
+                        new Paragraph({
+                            spacing: { after: 120 },
+                            children: [
+                                new TextRun({ text: "Căn cứ mã sự cố: ", font: fontName, size: 26 }),
+                                new TextRun({ text: item.ticketId || "……", font: fontName, bold: true, size: 26 }),
+                                new TextRun({ text: ` ngày ${errorDay} tháng ${errorMonth} năm ${errorYear} về việc “cấp vật tư xử lý sự cố trạm `, font: fontName, size: 26 }),
+                                new TextRun({ text: item.station || "……………", font: fontName, bold: true, size: 26 }),
+                                new TextRun({ text: "”;", font: fontName, size: 26 })
+                            ]
+                        }),
+
+                        new Paragraph({
+                            spacing: { after: 120 },
+                            children: [
+                                new TextRun({ text: "Tại: trạm ", font: fontName, size: 26 }),
+                                new TextRun({ text: item.station || "………………………….", font: fontName, bold: true, size: 26 }),
+                                new TextRun({ text: ", chúng tôi gồm:", font: fontName, size: 26 })
+                            ]
+                        }),
+
+                        new Paragraph({
+                            spacing: { after: 60 },
+                            children: [new TextRun({ text: "ĐẠI DIỆN BÊN GIAO:", font: fontName, bold: true, size: 26 })]
+                        }),
+                        new Paragraph({
+                            spacing: { left: 300, after: 120 },
+                            children: [
+                                new TextRun({ text: "Ông (Bà): ", font: fontName, size: 26 }),
+                                new TextRun({ text: item.senderName || "Hoàng Thị Ngọc", font: fontName, bold: true, size: 26 }),
+                                new TextRun({ text: "            Đơn vị: Tổ kỹ thuật", font: fontName, size: 26 })
+                            ]
+                        }),
+
+                        new Paragraph({
+                            spacing: { after: 60 },
+                            children: [new TextRun({ text: "ĐẠI DIỆN BÊN NHẬN:", font: fontName, bold: true, size: 26 })]
+                        }),
+                        new Paragraph({
+                            spacing: { left: 300, after: 120 },
+                            children: [
+                                new TextRun({ text: "Ông (Bà): ", font: fontName, size: 26 }),
+                                new TextRun({ text: item.receiverName || "……………………….", font: fontName, bold: true, size: 26 }),
+                                new TextRun({ text: "            Đơn vị: Tổ kỹ thuật", font: fontName, size: 26 })
+                            ]
+                        }),
+
+                        new Paragraph({
+                            spacing: { after: 180 },
+                            children: [
+                                new TextRun({ text: "ĐỊA ĐIỂM: Trạm ", font: fontName, size: 26 }),
+                                new TextRun({ text: item.station || "……………………………..", font: fontName, bold: true, size: 26 })
+                            ]
+                        }),
+
+                        new Paragraph({
+                            spacing: { after: 180 },
+                            children: [new TextRun({ text: "Tiến hành nghiệm thu bàn giao, nội dung cụ thể như sau:", font: fontName, size: 26 })]
+                        }),
+
+                        // --- BẢNG VẬT TƯ THIẾT BỊ ---
+                        new Table({
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            rows: [
+                                // Tiêu đề bảng
+                                new TableRow({
+                                    tableHeader: true,
+                                    children: [
+                                        new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "STT", font: fontName, bold: true, size: 24 })] })] }),
+                                        new TableCell({ width: { size: 37, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "TÊN VẬT TƯ/THIẾT BỊ", font: fontName, bold: true, size: 24 })] })] }),
+                                        new TableCell({ width: { size: 25, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "MÃ, SERIAL", font: fontName, bold: true, size: 24 })] })] }),
+                                        new TableCell({ width: { size: 12, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Đơn vị Tính", font: fontName, bold: true, size: 24 })] })] }),
+                                        new TableCell({ width: { size: 10, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Số Lượng", font: fontName, bold: true, size: 24 })] })] }),
+                                        new TableCell({ width: { size: 13, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Ghi Chú", font: fontName, bold: true, size: 24 })] })] }),
+                                    ]
+                                }),
+                                // Dòng dữ liệu vật tư cấp từ phiếu
+                                new TableRow({
+                                    children: [
+                                        new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "1", font: fontName, size: 24 })] })] }),
+                                        new TableCell({ children: [new Paragraph({ spacing: { left: 60 }, children: [new TextRun({ text: item.materialName || "-", font: fontName, size: 24 })] })] }),
+                                        new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.materialSerial || "-", font: fontName, size: 24 })] })] }),
+                                        new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Cái/Bộ", font: fontName, size: 24 })] })] }),
+                                        new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(item.materialQty || "1"), font: fontName, size: 24 })] })] }),
+                                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "", font: fontName, size: 24 })] })] }),
+                                    ]
+                                })
+                            ]
+                        }),
+
+                        new Paragraph({ text: "", spacing: { after: 180 } }),
+
+                        // --- CAM KẾT CHUNG ---
+                        new Paragraph({
+                            spacing: { after: 300 },
+                            children: [new TextRun({ text: "Toàn bộ vật tư, thiết bị trên đã được lắp đặt hoàn thành và bàn giao đưa vào sử dụng. Biên bản được lập thành 02 bản có giá trị như nhau. Mỗi bên giữ 01 bản.", font: fontName, italic: true, size: 26 })]
+                        }),
+
+                        // --- PHẦN KÝ TÊN (Bảng phân chia 4 vị trí) ---
+                        new Table({
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            borders: docx.Borders.NONE,
+                            rows: [
+                                new TableRow({
+                                    children: [
+                                        new TableCell({ width: { size: 25, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "NGƯỜI GIAO", font: fontName, bold: true, size: 22 })] })] }),
+                                        new TableCell({ width: { size: 25, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "NGƯỜI NHẬN", font: fontName, bold: true, size: 22 })] })] }),
+                                        new TableCell({ width: { size: 25, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "TỔ/ TRẠM TRƯỞNG", font: fontName, bold: true, size: 22 })] })] }),
+                                        new TableCell({ width: { size: 25, type: WidthType.PERCENTAGE }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "TRƯỞNG ĐÀI", font: fontName, bold: true, size: 22 })] })] }),
+                                    ]
+                                }),
+                                // Dòng trống tạo không gian ký tên
+                                new TableRow({
+                                    children: [
+                                        new TableCell({ children: [new Paragraph({ text: "", spacing: { after: 1000 } })] }),
+                                        new TableCell({ children: [new Paragraph({ text: "", spacing: { after: 1000 } })] }),
+                                        new TableCell({ children: [new Paragraph({ text: "", spacing: { after: 1000 } })] }),
+                                        new TableCell({ children: [new Paragraph({ text: "", spacing: { after: 1000 } })] }),
+                                    ]
+                                }),
+                                // Dòng họ tên cố định theo mẫu
+                                new TableRow({
+                                    children: [
+                                        new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.senderName || "Hoàng Thị Ngọc", font: fontName, bold: true, size: 24 })] })] }),
+                                        new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.receiverName || "", font: fontName, bold: true, size: 24 })] })] }),
+                                        new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Bùi Thanh Đạt", font: fontName, bold: true, size: 24 })] })] }),
+                                        new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Trần Văn Khoa", font: fontName, bold: true, size: 24 })] })] }),
+                                    ]
+                                })
+                            ]
+                        })
+                    ]
+                }]
+            });
+
+            // Tiến hành đóng gói và tải file .docx về máy tính
+            docx.Packer.toBlob(doc).then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `BB_Ban_Giao_${item.ticketId || 'SC'}_${item.station || 'Tram'}.docx`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            });
+        };
     </script>
 </body>
 </html>
